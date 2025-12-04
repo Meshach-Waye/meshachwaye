@@ -18,11 +18,15 @@ const AudioCard = ({ title, audioUrl, variant = "default" }: AudioCardProps) => 
     if (!audio) return;
 
     const updateProgress = () => {
-      setProgress((audio.currentTime / audio.duration) * 100);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setProgress((audio.currentTime / audio.duration) * 100);
+      }
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
@@ -30,27 +34,48 @@ const AudioCard = ({ title, audioUrl, variant = "default" }: AudioCardProps) => 
       setProgress(0);
     };
 
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      setIsPlaying(false);
+    };
+
+    const handleCanPlay = () => {
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
     audio.addEventListener("timeupdate", updateProgress);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
 
     return () => {
       audio.removeEventListener("timeupdate", updateProgress);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
     };
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
+      setIsPlaying(false);
     } else {
-      audio.play();
+      try {
+        await audio.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error("Playback failed:", error);
+        setIsPlaying(false);
+      }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -90,7 +115,7 @@ const AudioCard = ({ title, audioUrl, variant = "default" }: AudioCardProps) => 
 
   return (
     <div className={`audio-card border ${borderColor}`}>
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio ref={audioRef} src={audioUrl} preload="auto" crossOrigin="anonymous" />
       
       <div className="flex items-center gap-4">
         {/* Play button */}
