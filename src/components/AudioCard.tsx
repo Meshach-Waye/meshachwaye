@@ -115,7 +115,7 @@ const AudioCard = ({ title, audioUrl, variant = "default" }: AudioCardProps) => 
 
   return (
     <div className={`audio-card border ${borderColor}`}>
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio ref={audioRef} src={audioUrl} preload="auto" crossOrigin="anonymous" />
       
       <div className="flex items-center gap-4">
         {/* Play button */}
