@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { Headphones, Menu, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Headphones, Menu, X, LogIn, LogOut, Shield } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -17,6 +21,11 @@ const Navbar = () => {
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
     setIsMobileMenuOpen(false);
   };
 
@@ -37,16 +46,40 @@ const Navbar = () => {
           </button>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-6">
             <button onClick={() => scrollTo("about")} className="text-muted-foreground hover:text-primary transition-colors">
               About
             </button>
             <button onClick={() => scrollTo("portfolio")} className="text-muted-foreground hover:text-primary transition-colors">
               Portfolio
             </button>
-            <Button onClick={() => scrollTo("contact")} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={() => scrollTo("contact")} variant="outline" className="border-primary/50 hover:bg-primary/10">
               Get in Touch
             </Button>
+            
+            {user ? (
+              <>
+                {isAdmin && (
+                  <Button
+                    onClick={() => navigate("/admin")}
+                    variant="ghost"
+                    className="text-primary hover:bg-primary/10"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin
+                  </Button>
+                )}
+                <Button onClick={handleSignOut} variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => navigate("/auth")} variant="ghost" className="text-muted-foreground hover:text-foreground">
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -71,6 +104,30 @@ const Navbar = () => {
               <Button onClick={() => scrollTo("contact")} className="bg-primary hover:bg-primary/90 text-primary-foreground w-full">
                 Get in Touch
               </Button>
+              
+              {user ? (
+                <>
+                  {isAdmin && (
+                    <Button
+                      onClick={() => { navigate("/admin"); setIsMobileMenuOpen(false); }}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin Dashboard
+                    </Button>
+                  )}
+                  <Button onClick={handleSignOut} variant="ghost" className="w-full">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => { navigate("/auth"); setIsMobileMenuOpen(false); }} variant="ghost" className="w-full">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign In
+                </Button>
+              )}
             </div>
           </div>
         )}
