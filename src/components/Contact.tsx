@@ -4,14 +4,27 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+// Validation schema with proper limits
+const contactSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be under 100 characters"),
+  email: z.string().trim().email("Please enter a valid email").max(255, "Email must be under 255 characters"),
+  projectType: z.string().min(1, "Please select a project type"),
+  message: z.string().trim().min(1, "Message is required").max(2000, "Message must be under 2000 characters"),
+});
+
+type ContactFormData = z.infer<typeof contactSchema>;
 
 const Contact = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof ContactFormData, string>>>({});
   const sectionRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormData>({
     name: "",
     email: "",
     projectType: "",
@@ -36,23 +49,60 @@ const Contact = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear error when user starts typing
+    if (errors[name as keyof ContactFormData]) {
+      setErrors({ ...errors, [name]: undefined });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+
+    // Validate with zod
+    const result = contactSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: Partial<Record<keyof ContactFormData, string>> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as keyof ContactFormData] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const { error } = await supabase
+        .from("Website Contact Form")
+        .insert({
+          Name: result.data.name,
+          Email: result.data.email,
+          "Project Type": result.data.projectType,
+          Message: result.data.message,
+        });
 
-    toast({
-      title: "Message Sent!",
-      description: "Thanks for reaching out. I'll get back to you soon!",
-    });
+      if (error) throw error;
 
-    setFormData({ name: "", email: "", projectType: "", message: "" });
-    setIsSubmitting(false);
+      toast({
+        title: "Message Sent!",
+        description: "Thanks for reaching out. I'll get back to you soon!",
+      });
+
+      setFormData({ name: "", email: "", projectType: "", message: "" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -91,9 +141,10 @@ const Contact = () => {
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="Your name"
-                  required
-                  className="bg-background/50 border-border/50 focus:border-primary h-12"
+                  maxLength={100}
+                  className={`bg-background/50 border-border/50 focus:border-primary h-12 ${errors.name ? "border-destructive" : ""}`}
                 />
+                {errors.name && <p className="text-destructive text-sm mt-1">{errors.name}</p>}
               </div>
 
               {/* Email */}
@@ -108,9 +159,10 @@ const Contact = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="your@email.com"
-                  required
-                  className="bg-background/50 border-border/50 focus:border-primary h-12"
+                  maxLength={255}
+                  className={`bg-background/50 border-border/50 focus:border-primary h-12 ${errors.email ? "border-destructive" : ""}`}
                 />
+                {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
               </div>
 
               {/* Project Type */}
@@ -123,8 +175,7 @@ const Contact = () => {
                   name="projectType"
                   value={formData.projectType}
                   onChange={handleChange}
-                  required
-                  className="w-full h-12 px-4 rounded-lg bg-background/50 border border-border/50 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  className={`w-full h-12 px-4 rounded-lg bg-background/50 border border-border/50 text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors ${errors.projectType ? "border-destructive" : ""}`}
                 >
                   <option value="">Select a project type</option>
                   <option value="podcast">Podcast Production</option>
@@ -135,6 +186,7 @@ const Contact = () => {
                   <option value="ai-audio">AI Audio Production</option>
                   <option value="other">Other</option>
                 </select>
+                {errors.projectType && <p className="text-destructive text-sm mt-1">{errors.projectType}</p>}
               </div>
 
               {/* Message */}
@@ -148,10 +200,14 @@ const Contact = () => {
                   value={formData.message}
                   onChange={handleChange}
                   placeholder="Tell me about your project..."
-                  required
+                  maxLength={2000}
                   rows={5}
-                  className="bg-background/50 border-border/50 focus:border-primary resize-none"
+                  className={`bg-background/50 border-border/50 focus:border-primary resize-none ${errors.message ? "border-destructive" : ""}`}
                 />
+                <div className="flex justify-between mt-1">
+                  {errors.message && <p className="text-destructive text-sm">{errors.message}</p>}
+                  <p className="text-muted-foreground text-xs ml-auto">{formData.message.length}/2000</p>
+                </div>
               </div>
 
               {/* Submit Button */}
